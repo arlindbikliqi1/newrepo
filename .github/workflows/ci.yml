@@ -1,25 +1,55 @@
-name: Node.js CI
+name: Laravel CI/CD
 
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout your Laravel project
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      # Step 2: Set up PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
         with:
-          node-version: '16'
+          php-version: '8.2'
+          extensions: mbstring, pdo, bcmath
+          ini-values: post_max_size=256M, upload_max_filesize=256M
+          coverage: none
 
-      - name: Install dependencies
-        run: npm install
+      # Step 3: Install dependencies
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
 
-      - name: Run tests
-        run: npm test
+      # Step 4: Setup Laravel environment
+      - name: Setup Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Step 5: Run tests (optional)
+      - name: Run Tests
+        run: php artisan test
+
+ # Step 6: Deploy to server
+      - name: Deploy to Server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER: 23.88.98.228
+          USER: root
+        run: |
+          ssh -o StrictHostKeyChecking=no -i "$SSH_PRIVATE_KEY" $USER@$SERVER << EOF
+            cd /path/to/your/project
+            git pull origin main
+            composer install --no-dev --optimize-autoloader
+            php artisan migrate --force
+            php artisan cache:clear
+            php artisan config:cache
+            php artisan route:cache
+          EOF
