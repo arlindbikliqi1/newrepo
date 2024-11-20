@@ -1,58 +1,49 @@
-name: CI/CD for Laravel Project
+needs: build-and-test
 
-on:
-  push:
-    branches:
-      - master  # Change this to your default branch if necessary
+if: github.ref == 'refs/heads/master' && success()
 
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+steps:
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.0'  # Change to your required PHP version
-          extensions: mbstring, xml, bcmath, zip, curl, mysqli, gd
-          ini-values: post_max_size=256M, upload_max_filesize=256M
+  - name: Set up SSH Key for Deployment
 
-      - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress --no-suggest
+    run: |
 
-      - name: Run Tests
-        run: php artisan test
+      mkdir -p ~/.ssh
 
-  deploy:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/master' && success()
-    runs-on: ubuntu-latest
+      echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      chmod 600 ~/.ssh/id_rsa
 
-      - name: Prepare SSH Key for Deployment
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+      ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy to Production Server
-        env:
-          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
-          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
-          APP_PATH: ${{ secrets.APP_PATH }}
-        run: |
-          ssh ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
-            cd ${APP_PATH}
-            git pull origin master
-            composer install --prefer-dist --no-progress --no-suggest
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan route:cache
-          EOF
+  - name: Deploy to Production Server
+
+    env:
+
+      PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+
+      PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+
+      APP_PATH: ${{ secrets.APP_PATH }}
+
+    run: |
+
+      ssh -o StrictHostKeyChecking=no ${PRODUCTION_USER}@${PRODUCTION_HOST} << EOF
+
+        cd ${APP_PATH}
+
+        git fetch --all
+
+        git reset --hard origin/master
+
+        composer install --prefer-dist --no-progress --no-suggest
+
+        php artisan migrate --force
+
+        php artisan config:cache
+
+        php artisan route:cache
+
+      EOF
