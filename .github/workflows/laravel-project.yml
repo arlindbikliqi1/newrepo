@@ -1,49 +1,48 @@
-needs: build-and-test
+name: Deploy Laravel App
 
-if: github.ref == 'refs/heads/master' && success()
+on:
+  push:
+    branches:
+      - master
 
-runs-on: ubuntu-latest
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-steps:
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-  - name: Set up SSH Key for Deployment
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, bcmath, pdo, pdo_mysql
 
-    run: |
+      - name: Install Composer Dependencies
+        run: |
+          curl -sS https://getcomposer.org/installer | php
+          php composer.phar install --no-interaction --prefer-dist
 
-      mkdir -p ~/.ssh
+      - name: Set up SSH Key for Deployment
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
 
-      echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-
-      chmod 600 ~/.ssh/id_rsa
-
-      ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
-
-  - name: Deploy to Production Server
-
-    env:
-
-      PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
-
-      PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
-
-      APP_PATH: ${{ secrets.APP_PATH }}
-
-    run: |
-
-      ssh -o StrictHostKeyChecking=no ${PRODUCTION_USER}@${PRODUCTION_HOST} << EOF
-
-        cd ${APP_PATH}
-
-        git fetch --all
-
-        git reset --hard origin/master
-
-        composer install --prefer-dist --no-progress --no-suggest
-
-        php artisan migrate --force
-
-        php artisan config:cache
-
-        php artisan route:cache
-
-      EOF
+      - name: Deploy to Production Server
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ${PRODUCTION_USER}@${PRODUCTION_HOST} << EOF
+            cd ${APP_PATH}
+            git pull origin master
+            composer install --prefer-dist --no-progress --no-suggest
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan optimize
+          EOF
