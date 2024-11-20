@@ -1,6 +1,6 @@
 name: Laravel CI
 
-on:
+on: 
   push:
     branches:
       - master   # Change this to your default branch
@@ -30,7 +30,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Generate application key
-        run: php artisan key:generate
+        run: php artisan key:generate 
 
       - name: Run database migrations
         run: php artisan migrate --env=testing
@@ -38,10 +38,26 @@ jobs:
       - name: Run tests
         run: php artisan test
 
-      - name: Deploy
-        if: github.ref == 'refs/heads/main'
+      - name: Deploy to Production
+        if: github.ref == 'refs/heads/master'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          APP_PATH: ${{ secrets.APP_PATH }}
         run: |
+          echo "Setting up SSH agent..."
+          mkdir -p ~/.ssh
+          echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${PRODUCTION_HOST}" >> ~/.ssh/known_hosts
+
           echo "Deploying to production server..."
-          # Add your deployment commands here
-          # For example, you could use SSH to deploy your application
-          # ssh user@your-server 'cd /path/to/your/app && git pull && php artisan migrate'
+          ssh ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
+            cd ${APP_PATH}
+            git pull origin master
+            composer install --prefer-dist --no-progress --no-suggest --optimize-autoloader
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+          EOF
