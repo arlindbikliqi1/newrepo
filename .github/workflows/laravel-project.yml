@@ -40,39 +40,22 @@ jobs:
 
       - name: Deploy to Production
         if: github.ref == 'refs/heads/master'
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
-          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
-          APP_PATH: ${{ secrets.APP_PATH }}
         run: |
           set -x # Enable debugging
-          
-          # Create the .ssh directory if it doesn't exist
-          mkdir -p ~/.ssh
-          
-          # Write the SSH private key to the file
-          echo "${SSH_PRIVATE_KEY}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          # Debugging: Print masked PRODUCTION_HOST
-          echo "Using PRODUCTION_HOST: ${PRODUCTION_HOST:0:5}... (masked for security)"
-
-          # Add the host to known_hosts
-          ssh-keyscan -H "${PRODUCTION_HOST}" >> ~/.ssh/known_hosts || { echo "Failed to add host to known_hosts"; exit 1; }
-          
-          # Test SSH connection
-          ssh -T ${PRODUCTION_USER}@${PRODUCTION_HOST} || { echo "SSH connection failed"; exit 1; }
 
           echo "Deploying to production server..."
-          ssh ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
-            set -x # Enable debugging for remote commands
-            cd ${APP_PATH} || { echo "Failed to change directory to ${APP_PATH}"; exit 1; }
-            git pull origin master || { echo "Failed to pull from repository"; exit 1; }
-            composer install --prefer-dist --no-progress --no-suggest || { echo "Composer install failed"; exit 1; }
-            php artisan migrate --force || { echo "Migration failed"; exit 1; }
-            php artisan config:cache || { echo "Config caching failed"; exit 1; }
-            php artisan route:cache || { echo "Route caching failed"; exit 1; }
-            php artisan view:cache || { echo "View caching failed"; exit 1; }
-            php artisan event:cache || { echo "Event caching failed"; exit 1; }
-          EOF
+
+          # Assuming the deployment commands are to be run in the current environment
+          # This is where you would typically run commands like pulling the latest code
+          # and running migrations, etc. directly on the server.
+
+          # Example commands (these won't work without a proper server environment)
+          # You might want to replace these with actual deployment commands that suit your setup.
+          cd /path/to/your/application || { echo "Failed to change directory"; exit 1; }
+          git pull origin master || { echo "Failed to pull from repository"; exit 1; }
+          composer install --prefer-dist --no-progress --no-suggest || { echo "Composer install failed"; exit 1; }
+          php artisan migrate --force || { echo "Migration failed"; exit 1; }
+          php artisan config:cache || { echo "Config caching failed"; exit 1; }
+          php artisan route:cache || { echo "Route caching failed"; exit 1; }
+          php artisan view:cache || { echo "View caching failed"; exit 1; }
+          php artisan event:cache || { echo "Event caching failed"; exit 1; }
