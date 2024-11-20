@@ -20,7 +20,7 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no username@yourserver.com << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@23.88.98.228 << 'EOF'
             cd /path/to/your/laravel/project
             git pull origin main
             composer install --no-interaction
