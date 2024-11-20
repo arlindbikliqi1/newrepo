@@ -38,29 +38,28 @@ jobs:
       - name: Run tests
         run: php artisan test
 
-  deploy:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/master' && success()
-    runs-on: ubuntu-latest
+deploy:
+  needs: build-and-test
+  if: github.ref == 'refs/heads/master' && success()
+  runs-on: ubuntu-latest
+  steps:
+    - name: Prepare SSH Key for Deployment
+      run: |
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -t rsa -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
 
-    steps:
-      - name: Prepare SSH Key for Deployment
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy to Production Server
-        env:
-          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
-          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
-          APP_PATH: ${{ secrets.APP_PATH }}
-        run: |
-          ssh ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
-            cd ${APP_PATH}
-            git pull origin master
-            composer install --prefer-dist --no-progress --no-suggest
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan route:cache
-          EOF
+    - name: Deploy to Production Server
+      env:
+        PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+        PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+        APP_PATH: ${{ secrets.APP_PATH }}
+      run: |
+        ssh -vvv ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
+          cd ${APP_PATH}
+          git pull origin master
+          composer install --prefer-dist --no-progress --no-suggest
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+        EOF
