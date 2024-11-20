@@ -10,7 +10,7 @@ if [[ -n $(git status --porcelain) ]]; then
 
   git commit -m "Auto-commit: $(date)"
 
-  git push origin main
+  git push origin master
 else
   echo "No changes to commit on $(date)"
 fi
