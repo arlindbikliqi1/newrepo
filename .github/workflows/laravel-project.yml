@@ -38,8 +38,30 @@ jobs:
       - name: Run tests
         run: php artisan test
 
-name: Deploy to Server
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/master' && success()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prepare SSH Key for Deployment
         run: |
-          ssh root@23.88.98.228 "cd /var/www/laravel-project && git pull origin main && php artisan migrate --force && php artisan config:cache"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to Production Server
         env:
-          SSH_AUTH_SOCK: ${{ steps.ssh-agent.outputs.ssh-auth-sock }}
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          APP_PATH: ${{ secrets.APP_PATH }}
+        run: |
+          ssh ${PRODUCTION_USER}@${PRODUCTION_HOST} << 'EOF'
+            cd ${APP_PATH}
+            git pull origin master
+            composer install --prefer-dist --no-progress --no-suggest
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+          EOF
